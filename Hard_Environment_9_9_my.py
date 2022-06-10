@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 """
-作者:86178
+作者:高冲
 日期:2021年09月09日
 """
 from airsim import client
