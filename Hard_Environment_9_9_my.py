@@ -20,7 +20,7 @@ nowv=[]
 cx = 320  # u_0,像素系与图片系的x方向偏值，就是一半的图片像素
 cy = 240  # v_0,像素系与图片系的y方向偏值，就是一半的图片像素
 fx = 268.5  # 焦距/dx
-fy = 268.5  # 焦距/dy                  第六个圈时，相机与圆的差值变小了。
+fy = 268.5  # 焦距/dy     第六个圈时，相机与圆的差值变小了。
 
 
 @jit
@@ -174,7 +174,6 @@ class airsim_client:
         self.client.takeoffAsync().join()
         # self.client.moveByVelocityAsync(0, 0, -1, 1.5)
         self.client.hoverAsync().join()  # 悬停函数
-        # time.sleep(2)
 
     def task_to_1_2_3_circle(self, circle_id_from_one):
         dif_x, dif_y, dif_z = 100, 100, 100
@@ -236,7 +235,7 @@ class airsim_client:
             dif_z = next_position[2] - arrived_position[2]
 
     def task_to_circle_1_3_moveByVelocityAsync(self, circle_id_from_one):
-        # 位置环，来通过速度控制飞行
+        # PID控制算法，位置环，来通过速度控制飞行
         error_position = np.array([100, 100, 100])
         dt, p, d = 0.02, 1.0, 0.06
         next_position = np.array(self.setpoints.get_circle_setpoint(circle_id_from_one)[0:3])
@@ -268,11 +267,6 @@ class airsim_client:
                                      self.client.getMultirotorState().kinematics_estimated.position.y_val,
                                      self.client.getMultirotorState().kinematics_estimated.position.z_val])
             error_position = (next_position - now_position)
-            # now_acceleration = np.array(
-            #     [self.client.getMultirotorState().kinematics_estimated.linear_acceleration.x_val,
-            #      self.client.getMultirotorState().kinematics_estimated.linear_acceleration.y_val,
-            #      self.client.getMultirotorState().kinematics_estimated.linear_acceleration.z_val])
-            # print(time.time()-c)
             velocitys = error_position * P  # +now_acceleration*D                   #+Intergration*I
             self.client.setVelocityControllerGains(
                 velocity_gains=VelocityControllerGains(x_gains=PIDGains(4, 0, 0.08),
@@ -356,10 +350,7 @@ class airsim_client:
                                      self.client.getMultirotorState().kinematics_estimated.position.y_val,
                                      self.client.getMultirotorState().kinematics_estimated.position.z_val])
             error_position = (next_position - now_position)
-            # now_velocity = np.array([self.client.getMultirotorState().kinematics_estimated.linear_velocity.x_val,
-            #                          self.client.getMultirotorState().kinematics_estimated.linear_velocity.y_val,
-            #                          self.client.getMultirotorState().kinematics_estimated.linear_velocity.z_val])
-            # print(time.time()-c)
+
             velocitys = error_position * P# +now_velocity*D                   #+Intergration*I
             nowx.append([error_position[0], error_position[1], error_position[2]])
             # self.client.setVelocityControllerGains(
@@ -399,11 +390,11 @@ class airsim_client:
     def task_predict_circle_4(self, move_time=1.4, read_number=40):  # move_time用来弥补无人机移动需要的时间误差，read_number为采样数据个数
         def siny(x, a, b):  # 定义拟合的目标函数
             return 1.575 * np.sin(a * x + b) + 24.60
-        # 读取相关数据 1
+        # 读取相关数据
         first_t = time.time()
-        t_list = []      # 读取照片的时间戳
-        y_list = []      # 照片中计算的y的值
-        read_time = []  # 每次读取照片所用的时间
+        t_list = []
+        y_list = []
+        read_time = []
         for i in range(read_number):
             before_read_time = time.time()
             circle_xyz = self.circle_finder.get_circle_position_in_wc()
@@ -431,7 +422,7 @@ class airsim_client:
         a = a_pre_list[min_id]   # 平方误差小的为最佳拟合曲线参数
         b = b_pre_list[min_id]
 
-        # # 显示拟合的曲线 3
+        # # plot curve
         # print("a", a)    # 5 0.063 1 0.019
         # print("b", b)
         # print(a_pre_list)
@@ -442,7 +433,7 @@ class airsim_client:
         # plt.plot(siny(find_t, a, b))
         # plt.show()
 
-        # 预测移动时间后，圆的位置 4
+        # predict Pos
         move_time=move_time/t
         print("move_time", move_time)
         read_time = find_t[-1]
@@ -502,19 +493,6 @@ class airsim_client:
         b1 = b1_pre_list[min_id1]
         a2 = a2_pre_list[min_id2]
         b2 = b2_pre_list[min_id2]
-
-        # # 显示拟合的曲线 3
-        # print("a",a1,a2)    # -0.117887,-0.1097,速度7，频率0.11 0.11，速度7，0.015 速度为5,0.06
-        # print(find_t)
-        # print(find_y.tolist())
-        # print(find_z.tolist())
-        # plt.subplot(211)
-        # plt.plot(find_y)
-        # plt.plot(siny(find_t,a1,b1))
-        # plt.subplot(212)
-        # plt.plot(find_z)
-        # plt.plot(sinz(find_t,a2,b2))
-        # plt.show()
 
         # 预测移动时间后，圆的位置 4
         move_time=move_time/t
@@ -631,17 +609,6 @@ class airsim_client:
         c_z = popt[2]
         T_z = popt[3]
         # print("parm: ", a_z, b_z, c_z, T_z)
-
-        # 显示获取的图片
-        # print("find_y: ",find_y.tolist())
-        # print("find_z: ", find_z.tolist())
-        # plt.subplot(211)
-        # plt.plot(find_t,find_y,c='b')
-        # plt.plot(find_t,triangle_wave_y(find_t,a_y,b_y,c_y,T_y),c='r')
-        # plt.subplot(212)
-        # plt.plot(find_t, find_z, c='b')
-        # plt.plot(find_t, triangle_wave_z(find_t, a_z, b_z, c_z, T_z), c='r')
-        # plt.show()
 
         move_time = move_time/t
         read_time = find_t[-1]
@@ -769,50 +736,8 @@ class airsim_client:
         # print("alltime", time.time() - t)
 
 
-        # # 以下用于观察移动过圆的情况
-        # vx1=[i[0] for i in nowx]
-        # vx2=[i[0] for i in nowv]
-        # vy1=[i[1] for i in nowx]
-        # vy2=[i[1] for i in nowv]
-        # vz1=[i[2] for i in nowx]
-        # vz2=[i[2] for i in nowv]
-        # plt.subplot(311)
-        # plt.plot(vx1)
-        # plt.plot(vx2)
-        # plt.subplot(312)
-        # plt.plot(vy1)
-        # plt.plot(vy2)
-        # plt.subplot(313)
-        # plt.plot(vz1)
-        # plt.plot(vz2)
-        # plt.show()
-
-        # # 以下用于调试摄像头采取的照片
-        # x = []
-        # y = []
-        # z = []
-        # times=[]
-        # for i in range(400):
-        #     c = time.time()
-        #     circle_xyz = self.circle_finder.get_circle_position_in_wc()
-        #     print("rate2", 1 / (time.time() - c), "HZ")
-        #     z.append(circle_xyz[2])
-        #     y.append(circle_xyz[1])
-        #     x.append(circle_xyz[0])
-        #     times.append((time.time() - c))
-        # print(x)
-        # print(y)
-        # print(z)
-        # print(times)
-        # plt.subplot(311)
-        # plt.plot(x)
-        # plt.subplot(312)
-        # plt.plot(y)
-        # plt.subplot(313)
-        # plt.plot(z)
-        # plt.show()
 
 if __name__ == "__main__":
     client = airsim_client('127.0.0.1')
-    # '192.168.1.1'
+    # 本地测试'192.168.1.1'
     client.begin_task()
